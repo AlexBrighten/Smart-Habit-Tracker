@@ -1,4 +1,4 @@
-# FAANG Habit Performance Tracker
+# Habit Performance Tracker
 
 Mobile-first habit accountability dashboard built with Next.js App Router + Firebase Auth/Firestore.
 
