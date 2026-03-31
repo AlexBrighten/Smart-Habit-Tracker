@@ -64,7 +64,6 @@ npm run dev
 - Motivation engine:
 	- Urgency prompts
 	- Streak warnings
-	- FAANG countdown (365 days from account creation)
 - Fixed top banner: `JESUS IS MY CEO`
 
 ## Firestore Structure
