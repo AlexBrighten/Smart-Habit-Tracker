@@ -26,9 +26,11 @@ export type HabitDefinition = {
   label: string;
   category: HabitCategory;
   icon: string;
-  /** If true, show scripture input when this habit is marked done */
-  hasScriptureInput?: boolean;
-  scriptureInputLabel?: string;
+  /** If true, show text inputs when this habit is marked done */
+  hasLogInput?: boolean;
+  logInputLabel?: string;
+  logPlaceholder1?: string;
+  logPlaceholder2?: string;
 };
 
 /** false = not done, ISO string = done at that time, true = legacy (done, time unknown) */
@@ -39,7 +41,7 @@ export type HabitStatusMap = Record<HabitKey, HabitValue>;
 export type ScriptureEntry = {
   passage: string;
   notes: string;
-  type: "reading" | "memorization";
+  type: "reading" | "memorization" | string;
 };
 
 export const HABITS: HabitDefinition[] = [
@@ -54,16 +56,20 @@ export const HABITS: HabitDefinition[] = [
     label: "Bible Reading",
     category: "Spiritual Discipline",
     icon: "📖",
-    hasScriptureInput: true,
-    scriptureInputLabel: "What portion did you read?",
+    hasLogInput: true,
+    logInputLabel: "What portion did you read?",
+    logPlaceholder1: "e.g., Romans 8:28",
+    logPlaceholder2: "Quick note (optional)",
   },
   {
     key: "scriptureMemorization",
     label: "Scripture Memorization",
     category: "Spiritual Discipline",
     icon: "🧠",
-    hasScriptureInput: true,
-    scriptureInputLabel: "Which verse did you memorize?",
+    hasLogInput: true,
+    logInputLabel: "What verse are you memorizing?",
+    logPlaceholder1: "e.g., John 3:16",
+    logPlaceholder2: "Quick note (optional)",
   },
   {
     key: "nightReflectionPrayer",
@@ -76,12 +82,20 @@ export const HABITS: HabitDefinition[] = [
     label: "2 LeetCode Problems",
     category: "Career & Learning",
     icon: "💻",
+    hasLogInput: true,
+    logInputLabel: "Which problems did you solve?",
+    logPlaceholder1: "e.g., Two Sum, LRU Cache",
+    logPlaceholder2: "What did you learn? (optional)",
   },
   {
     key: "mernPractice",
     label: "MERN Stack Practice",
     category: "Career & Learning",
     icon: "⚛️",
+    hasLogInput: true,
+    logInputLabel: "What did you build/practice?",
+    logPlaceholder1: "e.g., Auth API, React Context",
+    logPlaceholder2: "Challenges faced (optional)",
   },
   {
     key: "technicalReading",

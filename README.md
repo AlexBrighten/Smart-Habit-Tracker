@@ -1,91 +1,63 @@
-# Habit Performance Tracker
+# Jesus is my CEO — Habit & Analytics Tracker
 
-Mobile-first habit accountability dashboard built with Next.js App Router + Firebase Auth/Firestore.
+A high-performance, mobile-first web application built with Next.js designed to track spiritual disciplines alongside coding progression (LeetCode, MERN stack). It features a sleek dark-themed UI, generative AI weekly reflections (powered by Gemini), and GitHub-style habit activity calendars.
 
-## Stack
+## Core Features
 
-- Next.js 16 (App Router)
-- TypeScript
-- Firebase Auth (Google only)
-- Firestore
-- Tailwind CSS v4
-- Recharts
+- **Unified Tracking**: Track spiritual disciplines (prayer, Bible reading, memorization) alongside physical health and career goals (LeetCode, technical reading, MERN practice).
+- **Intelligent Logging**: Interactive prompts ask specific follow-up questions for key habits. Log the Bible chapters you read, the specific LeetCode problem you solved, or the features you built.
+- **Epic AI Reflections**: Uses the Gemini API to analyze your week's logs, generating an "epic movie trailer" summary, actionable insights, pattern recognition, and spiritual overview.
+- **AI Scripture Flashcards**: Automatically turns memory verses and technical notes generated throughout the week into interactive flashcards for spaced repetition testing.
+- **Advanced Activity Analytics**: View 6-month historical activity via a GitHub-style contribution graph and percentage breakdown charts on a dedicated `/stats` page.
+- **Custom Day Boundaries**: Features a customized 3:00 AM reset time, preventing late-night (post-midnight) grinds from mistakenly logging into the next calendar day.
+- **Mobile-First Design**: Fully responsive tailored for an app-like experience on mobile screens, complete with bottom tab navigation.
 
-## Run Locally
+## Tech Stack
+- **Framework**: Next.js 14+ (App Router)
+- **Styling**: Tailwind CSS
+- **Database / Auth**: Firebase (Firestore, Authentication)
+- **Data Visualization**: Recharts
+- **AI Integration**: Google Gemini 2.0 API (`@google/generative-ai`)
 
-1. Install dependencies:
+## Getting Started
 
+### 1. Configure Firebase
+1. Create a project in the [Firebase Console](https://console.firebase.google.com).
+2. Enable Authentication (Email/Password) and Firestore Database.
+3. Configure Firestore Security Rules to secure user data:
+   ```javascript
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /users/{userId}/{document=**} {
+         allow read, write: if request.auth != null && request.auth.uid == userId;
+       }
+     }
+   }
+   ```
+
+### 2. Environment Variables
+Create a `.env.local` file in the root directory and populate it with your Firebase config and Gemini token:
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=your_value
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_value
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_value
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_value
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_value
+NEXT_PUBLIC_FIREBASE_APP_ID=your_value
+
+# Required for AI Reflections and Flashcards
+GEMINI_API_KEY=your_value
+```
+
+### 3. Install & Run
+Run the application locally:
 ```bash
 npm install
-```
-
-2. Add Firebase config to `.env.local` (already added in this workspace) or copy from `.env.example`:
-
-```bash
-cp .env.example .env.local
-```
-
-3. Start dev server:
-
-```bash
 npm run dev
 ```
 
-4. Open http://localhost:3000
+Navigate to [http://localhost:3000](http://localhost:3000) to create a user and begin tracking.
 
-## Firebase Setup Checklist
-
-1. In Firebase Console, enable Authentication -> Sign-in method -> Google.
-2. In Firestore Database, create database in production or test mode.
-3. Add localhost app domain if required by your auth settings.
-4. Ensure your Firebase web app config is set in `.env.local` using `NEXT_PUBLIC_FIREBASE_*` keys.
-
-## Implemented Features
-
-- Daily tracker with binary toggles (check or cross)
-- Dynamic progress bar + direct performance feedback bands
-- Weekly line chart with:
-	- Best day
-	- Worst day
-	- Weekly score
-	- Streak counter
-- Monthly calendar heatmap (GitHub-style intensity)
-- Long-term analytics:
-	- Monthly averages
-	- Half-year trend line
-	- Yearly performance average
-	- Habit-level consistency breakdown
-- Weekly reflection workflow:
-	- What went well
-	- Where you failed
-	- What distracted you
-	- What to fix next week
-- Reflection history list for pattern awareness
-- Motivation engine:
-	- Urgency prompts
-	- Streak warnings
-- Fixed top banner: `JESUS IS MY CEO`
-
-## Firestore Structure
-
-The app stores user-specific data under:
-
-```text
-users/{userId}/habits/{date}
-users/{userId}/weeklySummaries/{weekId}
-users/{userId}/reflections/{weekId}
-users/{userId}/stats/current
-```
-
-Habit document example:
-
-```json
-{
-	"date": "2026-03-31",
-	"habits": {
-		"morningPrayer": true,
-		"scriptureMemorization": false
-	},
-	"updatedAt": "serverTimestamp"
-}
-```
+---
+*Built with intent and discipline.*

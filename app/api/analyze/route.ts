@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
       analysis = JSON.parse(rawText);
     } catch {
       analysis = {
+        epicTrailer: "In a world of distractions, one developer stood up to build. But the servers went down, and the AI could not generate the reflection this week. Stay tuned for the next episode.",
         summary: rawText || "Could not generate analysis this week.",
         wins: [],
         patterns: [],
@@ -103,7 +104,7 @@ function buildAnalysisPrompt(
 
   const allScriptureContext =
     allScriptures && allScriptures.length > 0
-      ? `\n\nAll scripture entries this week:\n${allScriptures.map((s) => `- [${s.type}] ${s.passage}: ${s.notes}`).join("\n")}`
+      ? `\n\nAll custom log entries this week (includes Bible readings, LeetCode problems solved, MERN stack features built):\n${allScriptures.map((s) => `- [${s.type}] ${s.passage} ${s.notes ? `(${s.notes})` : ""}`).join("\n")}`
       : "";
 
   const goalsContext = goals && goals.length > 0
@@ -134,10 +135,11 @@ The habits tracked are:
 
 Respond in JSON format with exactly these fields:
 {
+  "epicTrailer": "Write a 3-4 sentence epic movie-trailer style voiceover script summarizing their week's conquests. Highlight specific LeetCode problems solved, MERN features built, or scriptures read from the log entries. Make it dramatic, high-energy, and intensely motivational ('In a world of distraction...').",
   "summary": "2-3 sentence overall assessment of the week. Be honest but encouraging.",
   "wins": ["array of 2-3 specific things that went well, reference actual data"],
   "patterns": ["array of 2-3 patterns noticed, especially timing issues like morning habits done late at night, or habits consistently missed on certain days"],
   "actionItems": ["array of 3 specific, actionable things to improve next week"],
-  "scriptureReview": "If there are scripture entries, provide a brief spiritual summary connecting the passages read/memorized this week. If no scripture data, say 'No scripture entries recorded this week.'"
+  "scriptureReview": "If there are scripture entries, provide a brief spiritual summary. If no scripture data, say 'No scripture entries recorded this week.'"
 }`;
 }

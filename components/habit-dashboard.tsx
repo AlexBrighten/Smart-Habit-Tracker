@@ -163,10 +163,10 @@ export default function HabitDashboard() {
   const [saving, setSaving] = useState<null | HabitKey>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Scripture input state
+  // Log input state
   const [expandedHabit, setExpandedHabit] = useState<HabitKey | null>(null);
-  const [scripturePassage, setScripturePassage] = useState("");
-  const [scriptureNotes, setScriptureNotes] = useState("");
+  const [logPrimary, setLogPrimary] = useState("");
+  const [logSecondary, setLogSecondary] = useState("");
 
   const ready = Boolean(auth && db);
 
@@ -261,10 +261,10 @@ export default function HabitDashboard() {
 
       const habitDef = HABITS.find((h) => h.key === key);
 
-      if (!isDone && habitDef?.hasScriptureInput) {
+      if (!isDone && habitDef?.hasLogInput) {
         setExpandedHabit(key);
-        setScripturePassage("");
-        setScriptureNotes("");
+        setLogPrimary("");
+        setLogSecondary("");
       } else if (isDone) {
         if (expandedHabit === key) setExpandedHabit(null);
       }
@@ -276,20 +276,20 @@ export default function HabitDashboard() {
     finally { setSaving(null); }
   }
 
-  function openScriptureInput(key: HabitKey) {
+  function openLogInput(key: HabitKey) {
     setExpandedHabit(key);
-    setScripturePassage("");
-    setScriptureNotes("");
+    setLogPrimary("");
+    setLogSecondary("");
   }
 
-  async function saveScripture(key: HabitKey) {
-    if (!db || !user || !scripturePassage.trim()) return;
+  async function saveLogInput(key: HabitKey) {
+    if (!db || !user || !logPrimary.trim()) return;
     try {
-      const type: "reading" | "memorization" = key === "scriptureMemorization" ? "memorization" : "reading";
-      const newEntry: ScriptureEntry = {
-        passage: scripturePassage.trim(),
-        notes: scriptureNotes.trim(),
-        type,
+      const type = key === "scriptureMemorization" ? "memorization" : key === "bibleReading" ? "reading" : key;
+      const newEntry: ScriptureEntry = { // Type remains ScriptureEntry in DB schema for now
+        passage: logPrimary.trim(),
+        notes: logSecondary.trim(),
+        type: type as any,
       };
       const updated = [...todayScriptures, newEntry];
 
@@ -297,10 +297,10 @@ export default function HabitDashboard() {
         { scriptures: updated, updatedAt: serverTimestamp() }, { merge: true });
 
       setExpandedHabit(null);
-      setScripturePassage("");
-      setScriptureNotes("");
+      setLogPrimary("");
+      setLogSecondary("");
     } catch {
-      setError("Couldn't save scripture entry.");
+      setError("Couldn't save log entry.");
     }
   }
 
@@ -434,30 +434,30 @@ export default function HabitDashboard() {
                       </span>
                     </button>
 
-                    {/* Scripture input */}
-                    {isExpanded && h.hasScriptureInput && (
+                    {/* Generic Log input */}
+                    {isExpanded && h.hasLogInput && (
                       <div className="scripture-input">
                         <p className="text-[11px] font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
-                          {h.scriptureInputLabel}
+                          {h.logInputLabel ?? "Log details"}
                         </p>
                         <input
                           type="text"
-                          value={scripturePassage}
-                          onChange={(e) => setScripturePassage(e.target.value)}
-                          placeholder="e.g., Romans 8:28"
+                          value={logPrimary}
+                          onChange={(e) => setLogPrimary(e.target.value)}
+                          placeholder={h.logPlaceholder1 ?? "What did you do?"}
                           className="scripture-field"
                           autoFocus
                         />
                         <input
                           type="text"
-                          value={scriptureNotes}
-                          onChange={(e) => setScriptureNotes(e.target.value)}
-                          placeholder="Quick note (optional)"
+                          value={logSecondary}
+                          onChange={(e) => setLogSecondary(e.target.value)}
+                          placeholder={h.logPlaceholder2 ?? "Notes (optional)"}
                           className="scripture-field mt-1.5"
                         />
                         <div className="flex gap-2 mt-2">
-                          <button type="button" onClick={() => saveScripture(h.key)}
-                            disabled={!scripturePassage.trim()}
+                          <button type="button" onClick={() => saveLogInput(h.key)}
+                            disabled={!logPrimary.trim()}
                             className="btn btn--accent" style={{ padding: "8px 14px", fontSize: 12 }}>
                             Save
                           </button>
@@ -469,30 +469,35 @@ export default function HabitDashboard() {
                       </div>
                     )}
 
-                    {/* Scripture entries */}
+                    {/* Log entries */}
                     {isDone && (
                       <div>
                         {todayScriptures
                           .filter((s) => {
                             if (h.key === "scriptureMemorization") return s.type === "memorization";
                             if (h.key === "bibleReading") return s.type === "reading";
-                            return false;
+                            return (s.type as string) === h.key;
                           })
-                          .map((s, i) => (
-                            <div key={i} className="scripture-entry">
-                              <span className="text-[11px]" style={{ color: "var(--accent)" }}>📜 {s.passage}</span>
-                              {s.notes && <span className="text-[10px] ml-2" style={{ color: "var(--text-muted)" }}>{s.notes}</span>}
-                            </div>
-                          ))}
+                          .map((s, i) => {
+                            const isCoding = h.key === "leetCodeTwoProblems";
+                            const isMern = h.key === "mernPractice";
+                            const icon = isCoding ? "💻" : isMern ? "⚛️" : "📜";
+                            return (
+                              <div key={i} className="scripture-entry">
+                                <span className="text-[11px]" style={{ color: "var(--accent)" }}>{icon} {s.passage}</span>
+                                {s.notes && <span className="text-[10px] ml-2" style={{ color: "var(--text-muted)" }}>{s.notes}</span>}
+                              </div>
+                            );
+                          })}
                           
-                        {!isExpanded && h.hasScriptureInput && (
+                        {!isExpanded && h.hasLogInput && (
                           <button 
                             type="button" 
-                            onClick={() => openScriptureInput(h.key)}
+                            onClick={() => openLogInput(h.key)}
                             className="mt-2 ml-[54px] text-[10px] font-bold tracking-wide"
                             style={{ color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
                           >
-                            + ADD PORTION
+                            + ADD LOG
                           </button>
                         )}
                       </div>

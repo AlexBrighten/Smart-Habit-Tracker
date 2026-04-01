@@ -27,6 +27,7 @@ import {
 /* ─── Types ─── */
 
 type AIAnalysis = {
+  epicTrailer?: string;
   summary: string;
   wins: string[];
   patterns: string[];
@@ -205,6 +206,10 @@ export default function ReflectionPage() {
     return Math.round(sum / 7);
   }, [weekData]);
 
+  const biblePortions = useMemo(() => {
+    return allScriptures.filter(s => s.type === "reading");
+  }, [allScriptures]);
+
   /* Generate AI Analysis */
   const generateAnalysis = useCallback(async () => {
     setGenerating(true);
@@ -331,6 +336,16 @@ export default function ReflectionPage() {
 
           {analysis ? (
             <div className="grid gap-3 mt-2">
+              {/* Epic Trailer */}
+              {analysis.epicTrailer && (
+                <div className="ai-card" style={{ background: "transparent", border: "1px solid var(--accent-medium)" }}>
+                  <p className="ai-card__label" style={{ color: "var(--accent)" }}>🎬 The Week's Trailer</p>
+                  <p className="ai-card__text italic font-medium" style={{ color: "var(--text-primary)", fontSize: "14px", lineHeight: "1.6" }}>
+                    &quot;{analysis.epicTrailer}&quot;
+                  </p>
+                </div>
+              )}
+
               {/* Summary */}
               <div className="ai-card">
                 <p className="ai-card__label">📝 Summary</p>
@@ -371,7 +386,22 @@ export default function ReflectionPage() {
               {analysis.scriptureReview && (
                 <div className="ai-card">
                   <p className="ai-card__label">✝️ Scripture Review</p>
-                  <p className="ai-card__text">{analysis.scriptureReview}</p>
+                  <p className="ai-card__text mb-3">{analysis.scriptureReview}</p>
+                  
+                  {/* Bible Portions Read This Week */}
+                  {biblePortions.length > 0 && (
+                    <div className="mt-3 pt-3" style={{ borderTop: "1px dashed var(--border)" }}>
+                      <p className="text-[11px] font-bold mb-2 uppercase tracking-wide" style={{ color: "var(--accent)" }}>Chapters Read This Week</p>
+                      <ul className="flex flex-col gap-1.5">
+                        {biblePortions.map((p, i) => (
+                          <li key={i} className="text-[12px] flex items-center gap-2" style={{ color: "var(--text-secondary)" }}>
+                            <span className="text-[10px]">📖</span> {p.passage}
+                            {p.notes && <span className="opacity-50 text-[10px] ml-1">({p.notes})</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

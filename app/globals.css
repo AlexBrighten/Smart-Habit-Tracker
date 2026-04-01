@@ -116,6 +116,8 @@ body {
   padding: 16px;
   border: 1px solid var(--border);
   backdrop-filter: blur(12px);
+  min-width: 0;
+  width: 100%;
 }
 
 .panel-flush {
@@ -145,6 +147,7 @@ body {
   border-top: none;
   font-family: inherit;
   color: inherit;
+  min-width: 0;
 }
 
 .habit-item:last-child {
@@ -565,6 +568,8 @@ body {
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 14px;
+  min-width: 0;
+  width: 100%;
 }
 
 .ai-card__label {
@@ -672,8 +677,10 @@ body {
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
-  padding: 0 14px;
+  padding: 0 16px; 
   padding-top: 52px;
   padding-bottom: calc(var(--bottom-nav-h) + 16px);
   overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
 }
