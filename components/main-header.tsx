@@ -43,8 +43,8 @@ export default function MainHeader() {
               onClick={() => setMenuOpen(!menuOpen)}
               className="flex h-8 w-8 items-center justify-center rounded-full transition-colors"
               style={{
-                border: "1px solid var(--border)",
-                background: "var(--bg-alpha-base)",
+                border: "1px solid rgba(0, 240, 255, 0.3)",
+                background: "rgba(0, 40, 80, 0.6)",
                 color: "var(--text-primary)"
               }}
               aria-label="Menu"

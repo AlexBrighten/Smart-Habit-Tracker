@@ -18,15 +18,6 @@ import {
   setDoc,
 } from "firebase/firestore";
 import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import {
   CATEGORY_ORDER,
   CATEGORY_ICONS,
   HABITS,
@@ -49,7 +40,6 @@ import {
 /* ─── Types ─── */
 
 type WeeklyPoint = { date: string; label: string; completion: number };
-type MonthlyPoint = { label: string; average: number };
 
 /* ─── Constants ─── */
 
@@ -130,39 +120,6 @@ function weeklyPts(logs: Record<string, HabitStatusMap>): WeeklyPoint[] {
   });
 }
 
-function monthlyPts(logs: Record<string, HabitStatusMap>, months = 12): MonthlyPoint[] {
-  const now = getEffectiveDate();
-  return Array.from({ length: months }, (_, i) => {
-    const ptr = new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1);
-    const y = ptr.getFullYear(), m = ptr.getMonth();
-    let sum = 0, cnt = 0;
-    Object.entries(logs).forEach(([k, v]) => {
-      const [ky, km] = k.split("-").map(Number);
-      if (ky === y && km === m + 1) { sum += pct(v); cnt++; }
-    });
-    return { label: ptr.toLocaleDateString(undefined, { month: "short" }), average: cnt ? Math.round(sum / cnt) : 0 };
-  });
-}
-
-function heatData(logs: Record<string, HabitStatusMap>) {
-  const now = getEffectiveDate();
-  const y = now.getFullYear(), m = now.getMonth();
-  const days = new Date(y, m + 1, 0).getDate();
-  return Array.from({ length: days }, (_, i) => {
-    const d = new Date(y, m, i + 1);
-    const k = fmtKey(d);
-    return { key: k, day: i + 1, pct: pct(logs[k] ?? getEmptyHabitStatus()) };
-  });
-}
-
-function hLvl(p: number) {
-  if (p >= 90) return "heat-4";
-  if (p >= 70) return "heat-3";
-  if (p >= 40) return "heat-2";
-  if (p > 0) return "heat-1";
-  return "heat-0";
-}
-
 /* ─── Sub-components ─── */
 
 function Ring({ percent }: { percent: number }) {
@@ -183,22 +140,6 @@ function Ring({ percent }: { percent: number }) {
           {percent}<span className="text-[13px] font-normal" style={{ color: "var(--text-muted)" }}>%</span>
         </span>
       </div>
-    </div>
-  );
-}
-
-function Toggle({ title, icon, defaultOpen = false, children }: {
-  title: string; icon?: string; defaultOpen?: boolean; children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="panel fade-up">
-      <button type="button" className="toggle-btn" onClick={() => setOpen(!open)}>
-        <span className={`toggle-chevron ${open ? "toggle-chevron--open" : ""}`}>▶</span>
-        {icon && <span>{icon}</span>}
-        <span>{title}</span>
-      </button>
-      {open && <div className="mt-3">{children}</div>}
     </div>
   );
 }
@@ -226,9 +167,6 @@ export default function HabitDashboard() {
   const [expandedHabit, setExpandedHabit] = useState<HabitKey | null>(null);
   const [scripturePassage, setScripturePassage] = useState("");
   const [scriptureNotes, setScriptureNotes] = useState("");
-  const [graphType, setGraphType] = useState<"weekly" | "monthly">("weekly");
-  const [filterMonth, setFilterMonth] = useState<string>("all");
-  const [filterYear, setFilterYear] = useState<string>("all");
 
   const ready = Boolean(auth && db);
 
@@ -284,41 +222,14 @@ export default function HabitDashboard() {
   const doneCount = Object.values(today).filter(isHabitDone).length;
   const todayScriptures = scriptures[todayKey] ?? [];
 
-  const effDate = getEffectiveDate();
   const weekly = useMemo(() => weeklyPts(logs), [logs]);
   const weeklyAvg = useMemo(() => Math.round(weekly.reduce((a, w) => a + w.completion, 0) / weekly.length), [weekly]);
   const streak = useMemo(() => calcStreak(logs), [logs]);
-  const heat = useMemo(() => heatData(logs), [logs]);
-  const monthly = useMemo(() => monthlyPts(logs), [logs]);
   const yearlyAvg = useMemo(() => {
     const cutoff = fmtKey(addD(getEffectiveDate(), -365));
     const e = Object.entries(logs).filter(([d]) => d >= cutoff);
     if (!e.length) return 0;
     return Math.round(e.reduce((a, [, s]) => a + pct(s), 0) / e.length);
-  }, [logs]);
-  const breakdown = useMemo(() => {
-    const filteredVals = Object.entries(logs).filter(([k]) => {
-      const [y, m] = k.split("-").map(Number);
-      if (filterYear !== "all" && y !== Number(filterYear)) return false;
-      if (filterMonth !== "all" && m !== Number(filterMonth) + 1) return false;
-      return true;
-    }).map(([_, v]) => v);
-    const total = filteredVals.length || 1;
-    return HABITS.map((h) => ({
-      key: h.key, label: h.label, icon: h.icon,
-      consistency: Math.round(filteredVals.reduce((a, d) => a + (isHabitDone(d[h.key]) ? 1 : 0), 0) / total * 100),
-    })).sort((a, b) => b.consistency - a.consistency);
-  }, [logs, filterMonth, filterYear]);
-
-  const contributionGrid = useMemo(() => {
-    const arr = [];
-    const now = getEffectiveDate();
-    for (let i = 364; i >= 0; i--) {
-      const d = addD(now, -i);
-      const k = fmtKey(d);
-      arr.push({ date: d, key: k, pct: pct(logs[k] ?? getEmptyHabitStatus()) });
-    }
-    return arr;
   }, [logs]);
 
   /* Actions */
@@ -336,7 +247,7 @@ export default function HabitDashboard() {
     }, { merge: true });
     await setDoc(doc(db, "users", user.uid, "stats", "current"), {
       todayPercent: pct(next), weeklyAverage: avg, streak: calcStreak(nextMap),
-      yearlyAverage: yearlyAvg, halfYearTrend: monthlyPts(nextMap, 6), updatedAt: serverTimestamp(),
+      yearlyAverage: yearlyAvg, updatedAt: serverTimestamp(),
     }, { merge: true });
   }
 
@@ -593,130 +504,6 @@ export default function HabitDashboard() {
           ))}
         </div>
 
-        {/* ── Analytics (all collapsed by default) ── */}
-        <Toggle title="Progress" icon="📈">
-          <div className="flex gap-2 mb-3">
-            <button
-              onClick={() => setGraphType("weekly")}
-              className="text-[11px] font-bold tracking-wider px-3 py-1 rounded"
-              style={{
-                background: graphType === "weekly" ? "var(--accent-soft)" : "transparent",
-                color: graphType === "weekly" ? "var(--accent)" : "var(--text-muted)",
-                border: `1px solid ${graphType === "weekly" ? "var(--accent-medium)" : "var(--border)"}`
-              }}
-            >
-              WEEK
-            </button>
-            <button
-              onClick={() => setGraphType("monthly")}
-              className="text-[11px] font-bold tracking-wider px-3 py-1 rounded"
-              style={{
-                background: graphType === "monthly" ? "var(--accent-soft)" : "transparent",
-                color: graphType === "monthly" ? "var(--accent)" : "var(--text-muted)",
-                border: `1px solid ${graphType === "monthly" ? "var(--accent-medium)" : "var(--border)"}`
-              }}
-            >
-              MONTH
-            </button>
-          </div>
-          <div style={{ width: "100%", height: 160 }}>
-            <ResponsiveContainer width="100%" height={160} minWidth={0}>
-              <AreaChart data={graphType === "weekly" ? (weekly as any[]) : (monthly as any[])} margin={{ left: -20, right: 4, top: 4, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="pGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.2} />
-                    <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="label" tick={{ fill: "var(--text-muted)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fill: "var(--text-muted)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tipStyle} />
-                <Area type="monotone" dataKey={graphType === "weekly" ? "completion" : "average"} stroke="var(--accent)" strokeWidth={2}
-                  fill="url(#pGrad)" dot={{ r: 2.5, fill: "var(--accent)", stroke: "var(--surface)", strokeWidth: 2 }} activeDot={{ r: 4 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </Toggle>
-
-        <Toggle title="This Month" icon="📅">
-          <div className="grid grid-cols-7 gap-1">
-            {heat.map((d) => (
-              <div key={d.key} className={`heat-cell ${hLvl(d.pct)}`} title={`${d.key}: ${d.pct}%`}>
-                {d.day}
-              </div>
-            ))}
-          </div>
-          <div className="mt-2 flex items-center gap-1 text-[10px]" style={{ color: "var(--text-muted)" }}>
-            <span>0%</span>
-            {["heat-0", "heat-1", "heat-2", "heat-3", "heat-4"].map((c) => (
-              <span key={c} className={`heat-cell ${c}`} style={{ width: 10, height: 10, fontSize: 0 }} />
-            ))}
-            <span>100%</span>
-          </div>
-        </Toggle>
-
-        <Toggle title="Activity Calendar" icon="🗓️">
-          <div className="flex gap-1 overflow-x-auto pb-2" dir="ltr">
-            <div className="flex gap-1" style={{ minWidth: "max-content" }}>
-              {Array.from({ length: Math.ceil(contributionGrid.length / 7) }).map((_, colIndex) => (
-                <div key={colIndex} className="flex flex-col gap-1">
-                  {contributionGrid.slice(colIndex * 7, (colIndex + 1) * 7).map((d) => (
-                    <div 
-                      key={d.key} 
-                      className={`heat-cell ${hLvl(d.pct)}`} 
-                      style={{ width: 12, height: 12, fontSize: 0 }}
-                      title={`${d.date.toLocaleDateString()}: ${d.pct}%`} 
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        </Toggle>
-
-        <Toggle title="Habit Consistency" icon="🎯">
-          <div className="flex gap-2 mb-3">
-            <select
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
-              className="scripture-field text-[11px] py-1 px-2 flex-1"
-            >
-              <option value="all">All Months</option>
-              {Array.from({ length: 12 }).map((_, i) => {
-                const date = new Date(2000, i, 1);
-                return <option key={i} value={i}>{date.toLocaleString('default', { month: 'long' })}</option>
-              })}
-            </select>
-            <select
-              value={filterYear}
-              onChange={(e) => setFilterYear(e.target.value)}
-              className="scripture-field text-[11px] py-1 px-2 flex-1"
-            >
-              <option value="all">All Years</option>
-              <option value="2026">2026</option>
-              <option value="2027">2027</option>
-              <option value="2028">2028</option>
-            </select>
-          </div>
-          <div className="grid gap-2.5">
-            {breakdown.map((item) => (
-              <div key={item.key}>
-                <div className="mb-1 flex items-center gap-2 text-[12px]">
-                  <span>{item.icon}</span>
-                  <span style={{ color: "var(--text-secondary)", flex: 1 }}>{item.label}</span>
-                  <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{item.consistency}%</span>
-                </div>
-                <div className="bar-track">
-                  <div className="bar-fill" style={{
-                    width: `${item.consistency}%`,
-                    background: item.consistency >= 80 ? "var(--green)" : item.consistency >= 50 ? "var(--accent)" : "var(--red)",
-                  }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        </Toggle>
 
         {error && <div className="panel text-[13px]" style={{ color: "var(--red)" }}>{error}</div>}
       </div>
