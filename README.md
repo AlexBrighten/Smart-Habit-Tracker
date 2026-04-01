@@ -1,4 +1,4 @@
-# FAANG Habit Performance Tracker
+# Habit Performance Tracker
 
 Mobile-first habit accountability dashboard built with Next.js App Router + Firebase Auth/Firestore.
 
@@ -64,7 +64,6 @@ npm run dev
 - Motivation engine:
 	- Urgency prompts
 	- Streak warnings
-	- FAANG countdown (365 days from account creation)
 - Fixed top banner: `JESUS IS MY CEO`
 
 ## Firestore Structure
