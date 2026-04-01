@@ -21,6 +21,7 @@ import {
   ScriptureEntry,
   getEmptyHabitStatus,
   isHabitDone,
+  getEffectiveDate,
 } from "@/lib/habits";
 
 /* ─── Types ─── */
@@ -76,7 +77,7 @@ function addD(d: Date, n: number) {
   const c = new Date(d); c.setDate(c.getDate() + n); return c;
 }
 
-function wkId() { return fmtKey(weekStart(new Date())); }
+function wkId() { return fmtKey(weekStart(getEffectiveDate())); }
 
 function normalize(raw: unknown): HabitStatusMap {
   const e = getEmptyHabitStatus();
@@ -102,6 +103,7 @@ export default function ReflectionPage() {
   const [loading, setLoading] = useState(true);
   const [logs, setLogs] = useState<Record<string, { habits: HabitStatusMap; scriptures: ScriptureEntry[] }>>({});
   const [pastReflections, setPastReflections] = useState<SavedReflection[]>([]);
+  const [goals, setGoals] = useState<{text: string; type: string}[]>([]);
 
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [flashcardResult, setFlashcardResult] = useState<FlashcardResult | null>(null);
@@ -170,12 +172,18 @@ export default function ReflectionPage() {
       }
     );
 
-    return () => { u1(); u2(); };
+    const u3 = onSnapshot(collection(db, "users", user.uid, "goals"), (snap) => {
+      const g: {text: string; type: string}[] = [];
+      snap.forEach((d) => g.push({ text: d.data().text, type: d.data().type }));
+      setGoals(g);
+    });
+
+    return () => { u1(); u2(); u3(); };
   }, [user]);
 
   /* Get this week's data */
   const weekData: DayData[] = useMemo(() => {
-    const start = weekStart(new Date());
+    const start = weekStart(getEffectiveDate());
     return Array.from({ length: 7 }, (_, i) => {
       const d = addD(start, i);
       const k = fmtKey(d);
@@ -205,7 +213,7 @@ export default function ReflectionPage() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weekData, scriptures: allScriptures }),
+        body: JSON.stringify({ weekData, scriptures: allScriptures, goals }),
       });
       if (!res.ok) throw new Error("Analysis request failed");
       const data = await res.json();
@@ -276,38 +284,38 @@ export default function ReflectionPage() {
   /* ─── Renders ─── */
 
   if (!ready || loading) return (
-    <main className="mx-auto w-full max-w-lg px-4 pt-16 pb-24">
+    <main className="page-container">
       <div className="panel">
         <div className="skeleton" style={{ height: 20, width: "50%" }} />
-        <div className="skeleton mt-3" style={{ height: 120 }} />
+        <div className="skeleton mt-3" style={{ height: 100 }} />
       </div>
     </main>
   );
 
   if (!user) return (
-    <main className="mx-auto w-full max-w-lg px-4 pt-16 pb-24">
+    <main className="page-container">
       <div className="panel">
-        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>Sign in to access reflections.</p>
+        <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>Sign in to access reflections.</p>
       </div>
     </main>
   );
 
   return (
-    <main className="mx-auto w-full max-w-lg px-4 pt-16 pb-24">
+    <main className="page-container">
       <div className="grid gap-3">
 
         {/* ── Header ── */}
         <div className="panel fade-up">
-          <p className="text-[18px] font-bold greeting-accent">💡 Weekly Reflection</p>
-          <p className="mt-1 text-[12px]" style={{ color: "var(--text-muted)" }}>
-            Week of {wkId()} · {weekAvg}% average completion
+          <p className="text-[15px] font-bold greeting-accent">💡 Weekly Reflection</p>
+          <p className="mt-1 text-[11px]" style={{ color: "var(--text-muted)" }}>
+            Week of {wkId()} · {weekAvg}% avg
           </p>
         </div>
 
         {/* ── AI Analysis ── */}
         <div className="panel fade-up stagger-1">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
+          <div className="mb-3">
+            <p className="text-[13px] font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
               🤖 AI Analysis
             </p>
             <button
@@ -315,7 +323,7 @@ export default function ReflectionPage() {
               onClick={generateAnalysis}
               disabled={generating}
               className="btn btn--accent"
-              style={{ width: "auto", padding: "8px 16px", fontSize: 12 }}
+              style={{ padding: "9px 16px", fontSize: 12 }}
             >
               {generating ? "Analyzing…" : analysis ? "Regenerate" : "Generate Analysis"}
             </button>
@@ -376,8 +384,8 @@ export default function ReflectionPage() {
 
         {/* ── Scripture Flashcards ── */}
         <div className="panel fade-up stagger-2">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[14px] font-semibold" style={{ color: "var(--text-primary)" }}>
+          <div className="mb-3">
+            <p className="text-[13px] font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
               📖 Scripture Flashcards
             </p>
             <button
@@ -385,7 +393,7 @@ export default function ReflectionPage() {
               onClick={generateFlashcards}
               disabled={generatingCards}
               className="btn btn--accent"
-              style={{ width: "auto", padding: "8px 16px", fontSize: 12 }}
+              style={{ padding: "9px 16px", fontSize: 12 }}
             >
               {generatingCards ? "Generating…" : flashcardResult ? "Regenerate" : "Generate Cards"}
             </button>
@@ -449,7 +457,7 @@ export default function ReflectionPage() {
 
         {/* ── Personal Note ── */}
         <div className="panel fade-up stagger-3">
-          <p className="text-[14px] font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
+          <p className="text-[13px] font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
             ✏️ Personal Note
           </p>
           <textarea
@@ -471,7 +479,7 @@ export default function ReflectionPage() {
         {/* ── Past Reflections ── */}
         {pastReflections.length > 0 && (
           <div className="panel fade-up stagger-4">
-            <p className="text-[14px] font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
+            <p className="text-[13px] font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
               📁 Past Reflections
             </p>
             <div className="grid gap-2">

@@ -6,6 +6,7 @@ import Link from "next/link";
 const tabs = [
   { href: "/", label: "Today", icon: "📋" },
   { href: "/reflection", label: "Reflect", icon: "💡" },
+  { href: "/dreams", label: "Dreams", icon: "🚀" },
 ] as const;
 
 export default function BottomNav() {

@@ -8,6 +8,7 @@ export type HabitCategory =
 
 export type HabitKey =
   | "morningPrayer"
+  | "bibleReading"
   | "scriptureMemorization"
   | "nightReflectionPrayer"
   | "leetCodeTwoProblems"
@@ -47,14 +48,20 @@ export const HABITS: HabitDefinition[] = [
     label: "Morning Prayer",
     category: "Spiritual Discipline",
     icon: "🙏",
+  },
+  {
+    key: "bibleReading",
+    label: "Bible Reading",
+    category: "Spiritual Discipline",
+    icon: "📖",
     hasScriptureInput: true,
-    scriptureInputLabel: "What did you read today?",
+    scriptureInputLabel: "What portion did you read?",
   },
   {
     key: "scriptureMemorization",
     label: "Scripture Memorization",
     category: "Spiritual Discipline",
-    icon: "📖",
+    icon: "🧠",
     hasScriptureInput: true,
     scriptureInputLabel: "Which verse did you memorize?",
   },
@@ -152,6 +159,16 @@ export function getHabitTime(value: HabitValue): string | null {
     }
   }
   return null;
+}
+
+/**
+ * Returns the "effective" date for habit tracking.
+ * The day resets at 3 AM instead of midnight, so between
+ * 12:00 AM and 2:59 AM the app still shows the previous day's habits.
+ */
+export function getEffectiveDate(): Date {
+  const now = new Date();
+  return new Date(now.getTime() - 3 * 60 * 60 * 1000);
 }
 
 export function getEmptyHabitStatus(): HabitStatusMap {

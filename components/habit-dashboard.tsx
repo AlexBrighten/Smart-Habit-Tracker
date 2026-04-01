@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   GoogleAuthProvider,
@@ -39,6 +38,7 @@ import {
   getEmptyHabitStatus,
   isHabitDone,
   getHabitTime,
+  getEffectiveDate,
 } from "@/lib/habits";
 import { auth, db, googleProvider } from "@/lib/firebase";
 import {
@@ -54,8 +54,8 @@ type MonthlyPoint = { label: string; average: number };
 /* ─── Constants ─── */
 
 const TOTAL = HABITS.length;
-const RING_SIZE = 130;
-const RING_STROKE = 7;
+const RING_SIZE = 96;
+const RING_STROKE = 6;
 const RING_R = (RING_SIZE - RING_STROKE) / 2;
 const RING_C = 2 * Math.PI * RING_R;
 
@@ -106,32 +106,32 @@ function normalize(raw: unknown): HabitStatusMap {
 }
 
 function motiv(p: number) {
-  if (p === 100) return "🔥 Perfect execution. This is how champions are built.";
-  if (p >= 90) return "⚡ Almost there — close the gap and own the day.";
-  if (p >= 70) return "💪 Solid progress. Finish strong.";
-  if (p >= 40) return "🚀 Momentum building. Keep pushing.";
+  if (p === 100) return "🔥 Perfect day.";
+  if (p >= 90) return "⚡ Almost perfect — close it out.";
+  if (p >= 70) return "💪 Solid. Finish strong.";
+  if (p >= 40) return "🚀 Momentum building.";
   if (p > 0) return "🌱 Small start beats no start.";
-  return "⏳ Your day is waiting. Make the first move.";
+  return "⏳ Make the first move.";
 }
 
-function wkId() { return fmtKey(weekStart(new Date())); }
+function wkId() { return fmtKey(weekStart(getEffectiveDate())); }
 
 function calcStreak(logs: Record<string, HabitStatusMap>) {
-  let s = 0, cur = new Date();
+  let s = 0, cur = getEffectiveDate();
   while (logs[fmtKey(cur)] && pct(logs[fmtKey(cur)]) >= 70) { s++; cur = addD(cur, -1); }
   return s;
 }
 
 function weeklyPts(logs: Record<string, HabitStatusMap>): WeeklyPoint[] {
   return Array.from({ length: 7 }, (_, i) => {
-    const d = addD(new Date(), -(6 - i));
+    const d = addD(getEffectiveDate(), -(6 - i));
     const k = fmtKey(d);
     return { date: k, label: d.toLocaleDateString(undefined, { weekday: "short" }), completion: pct(logs[k] ?? getEmptyHabitStatus()) };
   });
 }
 
 function monthlyPts(logs: Record<string, HabitStatusMap>, months = 12): MonthlyPoint[] {
-  const now = new Date();
+  const now = getEffectiveDate();
   return Array.from({ length: months }, (_, i) => {
     const ptr = new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1);
     const y = ptr.getFullYear(), m = ptr.getMonth();
@@ -145,7 +145,7 @@ function monthlyPts(logs: Record<string, HabitStatusMap>, months = 12): MonthlyP
 }
 
 function heatData(logs: Record<string, HabitStatusMap>) {
-  const now = new Date();
+  const now = getEffectiveDate();
   const y = now.getFullYear(), m = now.getMonth();
   const days = new Date(y, m + 1, 0).getDate();
   return Array.from({ length: days }, (_, i) => {
@@ -179,8 +179,8 @@ function Ring({ percent }: { percent: number }) {
           strokeDashoffset={offset} className="progress-ring__circle" />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-[28px] font-bold" style={{ color: "var(--text-primary)" }}>
-          {percent}<span className="text-[16px] font-normal" style={{ color: "var(--text-muted)" }}>%</span>
+        <span className="text-[24px] font-bold" style={{ color: "var(--text-primary)" }}>
+          {percent}<span className="text-[13px] font-normal" style={{ color: "var(--text-muted)" }}>%</span>
         </span>
       </div>
     </div>
@@ -198,7 +198,7 @@ function Toggle({ title, icon, defaultOpen = false, children }: {
         {icon && <span>{icon}</span>}
         <span>{title}</span>
       </button>
-      {open && <div className="mt-4">{children}</div>}
+      {open && <div className="mt-3">{children}</div>}
     </div>
   );
 }
@@ -209,7 +209,7 @@ const tipStyle = {
   borderRadius: 8,
   color: "var(--text-primary)",
   fontSize: 12,
-  padding: "8px 12px",
+  padding: "6px 10px",
 };
 
 /* ─── Main Component ─── */
@@ -226,6 +226,9 @@ export default function HabitDashboard() {
   const [expandedHabit, setExpandedHabit] = useState<HabitKey | null>(null);
   const [scripturePassage, setScripturePassage] = useState("");
   const [scriptureNotes, setScriptureNotes] = useState("");
+  const [graphType, setGraphType] = useState<"weekly" | "monthly">("weekly");
+  const [filterMonth, setFilterMonth] = useState<string>("all");
+  const [filterYear, setFilterYear] = useState<string>("all");
 
   const ready = Boolean(auth && db);
 
@@ -275,29 +278,47 @@ export default function HabitDashboard() {
     return g;
   }, []);
 
-  const todayKey = fmtKey(new Date());
+  const todayKey = fmtKey(getEffectiveDate());
   const today = logs[todayKey] ?? getEmptyHabitStatus();
   const todayPct = pct(today);
   const doneCount = Object.values(today).filter(isHabitDone).length;
   const todayScriptures = scriptures[todayKey] ?? [];
 
+  const effDate = getEffectiveDate();
   const weekly = useMemo(() => weeklyPts(logs), [logs]);
   const weeklyAvg = useMemo(() => Math.round(weekly.reduce((a, w) => a + w.completion, 0) / weekly.length), [weekly]);
   const streak = useMemo(() => calcStreak(logs), [logs]);
   const heat = useMemo(() => heatData(logs), [logs]);
   const monthly = useMemo(() => monthlyPts(logs), [logs]);
   const yearlyAvg = useMemo(() => {
-    const cutoff = fmtKey(addD(new Date(), -365));
+    const cutoff = fmtKey(addD(getEffectiveDate(), -365));
     const e = Object.entries(logs).filter(([d]) => d >= cutoff);
     if (!e.length) return 0;
     return Math.round(e.reduce((a, [, s]) => a + pct(s), 0) / e.length);
   }, [logs]);
   const breakdown = useMemo(() => {
-    const vals = Object.values(logs); const total = vals.length || 1;
+    const filteredVals = Object.entries(logs).filter(([k]) => {
+      const [y, m] = k.split("-").map(Number);
+      if (filterYear !== "all" && y !== Number(filterYear)) return false;
+      if (filterMonth !== "all" && m !== Number(filterMonth) + 1) return false;
+      return true;
+    }).map(([_, v]) => v);
+    const total = filteredVals.length || 1;
     return HABITS.map((h) => ({
       key: h.key, label: h.label, icon: h.icon,
-      consistency: Math.round(vals.reduce((a, d) => a + (isHabitDone(d[h.key]) ? 1 : 0), 0) / total * 100),
+      consistency: Math.round(filteredVals.reduce((a, d) => a + (isHabitDone(d[h.key]) ? 1 : 0), 0) / total * 100),
     })).sort((a, b) => b.consistency - a.consistency);
+  }, [logs, filterMonth, filterYear]);
+
+  const contributionGrid = useMemo(() => {
+    const arr = [];
+    const now = getEffectiveDate();
+    for (let i = 364; i >= 0; i--) {
+      const d = addD(now, -i);
+      const k = fmtKey(d);
+      arr.push({ date: d, key: k, pct: pct(logs[k] ?? getEmptyHabitStatus()) });
+    }
+    return arr;
   }, [logs]);
 
   /* Actions */
@@ -329,13 +350,11 @@ export default function HabitDashboard() {
 
       const habitDef = HABITS.find((h) => h.key === key);
 
-      // If toggling ON a scripture habit, expand the input
       if (!isDone && habitDef?.hasScriptureInput) {
         setExpandedHabit(key);
         setScripturePassage("");
         setScriptureNotes("");
       } else if (isDone) {
-        // If toggling OFF, collapse if this was expanded
         if (expandedHabit === key) setExpandedHabit(null);
       }
 
@@ -344,6 +363,12 @@ export default function HabitDashboard() {
       await persist(next);
     } catch { setError("Couldn't save. Retry in a moment."); }
     finally { setSaving(null); }
+  }
+
+  function openScriptureInput(key: HabitKey) {
+    setExpandedHabit(key);
+    setScripturePassage("");
+    setScriptureNotes("");
   }
 
   async function saveScripture(key: HabitKey) {
@@ -377,7 +402,7 @@ export default function HabitDashboard() {
   /* ─── Renders ─── */
 
   if (!ready) return (
-    <main className="mx-auto w-full max-w-lg px-4 pt-16 pb-24">
+    <main className="page-container">
       <div className="panel" style={{ borderLeft: "3px solid var(--accent)" }}>
         <p className="text-sm font-semibold" style={{ color: "var(--accent)" }}>⚠️ Firebase setup required</p>
         <p className="mt-1 text-[13px]" style={{ color: "var(--text-secondary)" }}>
@@ -388,19 +413,19 @@ export default function HabitDashboard() {
   );
 
   if (loading) return (
-    <main className="mx-auto w-full max-w-lg px-4 pt-16 pb-24">
+    <main className="page-container">
       <div className="panel">
         <div className="skeleton" style={{ height: 20, width: "50%" }} />
-        <div className="skeleton mt-3" style={{ height: 130 }} />
+        <div className="skeleton mt-3" style={{ height: 100 }} />
       </div>
     </main>
   );
 
   if (!user) return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col items-center justify-center px-6">
-      <div className="fade-up w-full text-center">
-        <p className="text-3xl font-bold greeting-accent">Jesus is my CEO</p>
-        <p className="mt-3 text-[15px]" style={{ color: "var(--text-secondary)" }}>
+    <main className="flex min-h-dvh w-full flex-col items-center justify-center px-6">
+      <div className="fade-up w-full max-w-sm text-center">
+        <p className="text-2xl font-bold greeting-accent">Jesus is my CEO</p>
+        <p className="mt-3 text-[14px]" style={{ color: "var(--text-secondary)" }}>
           Track execution daily.<br />Let consistency compound.
         </p>
         <button type="button" onClick={login} className="btn btn--accent mt-10">
@@ -412,43 +437,51 @@ export default function HabitDashboard() {
   );
 
   return (
-    <main className="mx-auto w-full max-w-lg px-4 pt-16 pb-24">
+    <main className="page-container">
       <div className="grid gap-3">
 
-        {/* Hero */}
+        {/* ── Hero: Greeting + Ring + Stats ── */}
         <div className="panel fade-up">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-[18px] font-bold greeting-accent">{greeting()}</p>
-              <p className="mt-0.5 text-[12px]" style={{ color: "var(--text-muted)" }}>
-                {fmtHuman(new Date())}
+          <div className="flex items-center gap-4">
+            <Ring percent={todayPct} />
+            <div className="flex-1 min-w-0">
+              <p className="text-[15px] font-bold greeting-accent">{greeting()}</p>
+              <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>
+                {fmtHuman(getEffectiveDate())}
+              </p>
+              <p className="text-[11px] mt-1" style={{ color: "var(--text-muted)" }}>
+                {doneCount}/{TOTAL} completed
               </p>
             </div>
           </div>
-          <div className="mt-5 flex flex-col items-center gap-3">
-            <Ring percent={todayPct} />
-            <p className="text-[12px] font-medium" style={{ color: "var(--text-muted)" }}>
-              {doneCount} of {TOTAL} completed
-            </p>
-          </div>
-          <div className="motivation-banner mt-4">
-            <p className="text-[13px] font-medium" style={{ color: "var(--accent)" }}>
+          <div className="motivation-banner mt-3">
+            <p className="text-[12px] font-medium" style={{ color: "var(--accent)" }}>
               {motiv(todayPct)}
             </p>
           </div>
-          <Link href="/reflection" className="block mt-3 w-full panel" style={{ padding: "12px 14px", border: "1px solid var(--accent-medium)", background: "var(--accent-soft)" }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[13px] font-bold" style={{ color: "var(--text-primary)" }}>✨ AI Reflection</p>
-                <p className="text-[11px] mt-0.5" style={{ color: "var(--text-muted)" }}>Generate weekly insights & flashcards</p>
-              </div>
-              <span className="text-[16px]">→</span>
-            </div>
-          </Link>
         </div>
 
-        {/* Habits */}
-        <div className="panel-flush fade-up stagger-1">
+        {/* ── Inline Stats ── */}
+        <div className="fade-up stagger-1 grid grid-cols-3 gap-2">
+          <div className="stat-card">
+            <span className="stat-card__icon">🔥</span>
+            <p className="stat-card__value">{streak}</p>
+            <p className="stat-card__label">Streak</p>
+          </div>
+          <div className="stat-card">
+            <span className="stat-card__icon">📊</span>
+            <p className="stat-card__value">{weeklyAvg}%</p>
+            <p className="stat-card__label">This week</p>
+          </div>
+          <div className="stat-card">
+            <span className="stat-card__icon">🏆</span>
+            <p className="stat-card__value">{yearlyAvg}%</p>
+            <p className="stat-card__label">All time</p>
+          </div>
+        </div>
+
+        {/* ── Habits ── */}
+        <div className="panel-flush fade-up stagger-2">
           {CATEGORY_ORDER.map((cat) => (
             <div key={cat}>
               <div className="category-header">
@@ -472,8 +505,8 @@ export default function HabitDashboard() {
                       <span className={`habit-item__icon ${isDone ? "habit-item__icon--done" : "habit-item__icon--undone"}`}>
                         {h.icon}
                       </span>
-                      <div style={{ flex: 1, textAlign: "left" }}>
-                        <span className="text-[14px] font-medium" style={{
+                      <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
+                        <span className="text-[13px] font-medium" style={{
                           color: isDone ? "var(--text-muted)" : "var(--text-primary)",
                           textDecoration: isDone ? "line-through" : "none",
                         }}>
@@ -481,7 +514,7 @@ export default function HabitDashboard() {
                         </span>
                         {isDone && time && (
                           <span className="block text-[10px]" style={{ color: "var(--text-muted)" }}>
-                            ✓ Done at {time}
+                            ✓ {time}
                           </span>
                         )}
                       </div>
@@ -490,7 +523,7 @@ export default function HabitDashboard() {
                       </span>
                     </button>
 
-                    {/* Scripture input expansion */}
+                    {/* Scripture input */}
                     {isExpanded && h.hasScriptureInput && (
                       <div className="scripture-input">
                         <p className="text-[11px] font-medium mb-2" style={{ color: "var(--text-secondary)" }}>
@@ -525,20 +558,34 @@ export default function HabitDashboard() {
                       </div>
                     )}
 
-                    {/* Show today's scripture entries for this habit */}
-                    {isDone && todayScriptures
-                      .filter((s) => {
-                        if (h.key === "scriptureMemorization") return s.type === "memorization";
-                        if (h.key === "morningPrayer") return s.type === "reading";
-                        return false;
-                      })
-                      .map((s, i) => (
-                        <div key={i} className="scripture-entry">
-                          <span className="text-[11px]" style={{ color: "var(--accent)" }}>📜 {s.passage}</span>
-                          {s.notes && <span className="text-[10px] ml-2" style={{ color: "var(--text-muted)" }}>{s.notes}</span>}
-                        </div>
-                      ))
-                    }
+                    {/* Scripture entries */}
+                    {isDone && (
+                      <div>
+                        {todayScriptures
+                          .filter((s) => {
+                            if (h.key === "scriptureMemorization") return s.type === "memorization";
+                            if (h.key === "bibleReading") return s.type === "reading";
+                            return false;
+                          })
+                          .map((s, i) => (
+                            <div key={i} className="scripture-entry">
+                              <span className="text-[11px]" style={{ color: "var(--accent)" }}>📜 {s.passage}</span>
+                              {s.notes && <span className="text-[10px] ml-2" style={{ color: "var(--text-muted)" }}>{s.notes}</span>}
+                            </div>
+                          ))}
+                          
+                        {!isExpanded && h.hasScriptureInput && (
+                          <button 
+                            type="button" 
+                            onClick={() => openScriptureInput(h.key)}
+                            className="mt-2 ml-[54px] text-[10px] font-bold tracking-wide"
+                            style={{ color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                          >
+                            + ADD PORTION
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -546,93 +593,116 @@ export default function HabitDashboard() {
           ))}
         </div>
 
-        {/* Stats */}
-        <div className="fade-up stagger-2 grid grid-cols-3 gap-2">
-          <div className="stat-card">
-            <span className="stat-card__icon">🔥</span>
-            <p className="stat-card__value">{streak}</p>
-            <p className="stat-card__label">Day streak</p>
+        {/* ── Analytics (all collapsed by default) ── */}
+        <Toggle title="Progress" icon="📈">
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={() => setGraphType("weekly")}
+              className="text-[11px] font-bold tracking-wider px-3 py-1 rounded"
+              style={{
+                background: graphType === "weekly" ? "var(--accent-soft)" : "transparent",
+                color: graphType === "weekly" ? "var(--accent)" : "var(--text-muted)",
+                border: `1px solid ${graphType === "weekly" ? "var(--accent-medium)" : "var(--border)"}`
+              }}
+            >
+              WEEK
+            </button>
+            <button
+              onClick={() => setGraphType("monthly")}
+              className="text-[11px] font-bold tracking-wider px-3 py-1 rounded"
+              style={{
+                background: graphType === "monthly" ? "var(--accent-soft)" : "transparent",
+                color: graphType === "monthly" ? "var(--accent)" : "var(--text-muted)",
+                border: `1px solid ${graphType === "monthly" ? "var(--accent-medium)" : "var(--border)"}`
+              }}
+            >
+              MONTH
+            </button>
           </div>
-          <div className="stat-card">
-            <span className="stat-card__icon">📊</span>
-            <p className="stat-card__value">{weeklyAvg}%</p>
-            <p className="stat-card__label">This week</p>
-          </div>
-          <div className="stat-card">
-            <span className="stat-card__icon">🏆</span>
-            <p className="stat-card__value">{yearlyAvg}%</p>
-            <p className="stat-card__label">All time</p>
-          </div>
-        </div>
-
-        {/* Weekly Graph */}
-        <Toggle title="Weekly Progress" icon="📈" defaultOpen>
-          <div style={{ width: "100%", height: 176 }}>
-            <ResponsiveContainer width="100%" height={176} minWidth={0}>
-              <AreaChart data={weekly} margin={{ left: -20, right: 4, top: 4, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="wGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.2} />
-                    <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="label" tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis domain={[0, 100]} tick={{ fill: "var(--text-muted)", fontSize: 11 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tipStyle} />
-                <Area type="monotone" dataKey="completion" stroke="var(--accent)" strokeWidth={2.5}
-                  fill="url(#wGrad)" dot={{ r: 3, fill: "var(--accent)", stroke: "var(--surface)", strokeWidth: 2 }} activeDot={{ r: 5 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </Toggle>
-
-        {/* Heatmap */}
-        <Toggle title="This Month" icon="📅" defaultOpen>
-          <div className="grid grid-cols-7 gap-1.5">
-            {heat.map((d) => (
-              <div key={d.key} className={`heat-cell ${hLvl(d.pct)}`} title={`${d.key}: ${d.pct}%`}>
-                {d.day}
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 flex items-center gap-1.5 text-[10px]" style={{ color: "var(--text-muted)" }}>
-            <span>0%</span>
-            {["heat-0", "heat-1", "heat-2", "heat-3", "heat-4"].map((c) => (
-              <span key={c} className={`heat-cell ${c}`} style={{ width: 12, height: 12, fontSize: 0 }} />
-            ))}
-            <span>100%</span>
-          </div>
-        </Toggle>
-
-        {/* 12-Month */}
-        <Toggle title="12-Month Trend" icon="📉" defaultOpen>
           <div style={{ width: "100%", height: 160 }}>
             <ResponsiveContainer width="100%" height={160} minWidth={0}>
-              <AreaChart data={monthly} margin={{ left: -20, right: 4, top: 4, bottom: 0 }}>
+              <AreaChart data={graphType === "weekly" ? (weekly as any[]) : (monthly as any[])} margin={{ left: -20, right: 4, top: 4, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="tGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--green)" stopOpacity={0.15} />
-                    <stop offset="100%" stopColor="var(--green)" stopOpacity={0} />
+                  <linearGradient id="pGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.2} />
+                    <stop offset="100%" stopColor="var(--accent)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                 <XAxis dataKey="label" tick={{ fill: "var(--text-muted)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{ fill: "var(--text-muted)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <Tooltip contentStyle={tipStyle} />
-                <Area type="monotone" dataKey="average" stroke="var(--green)" strokeWidth={2}
-                  fill="url(#tGrad)" dot={{ r: 2.5, fill: "var(--green)", stroke: "var(--surface)", strokeWidth: 2 }} />
+                <Area type="monotone" dataKey={graphType === "weekly" ? "completion" : "average"} stroke="var(--accent)" strokeWidth={2}
+                  fill="url(#pGrad)" dot={{ r: 2.5, fill: "var(--accent)", stroke: "var(--surface)", strokeWidth: 2 }} activeDot={{ r: 4 }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </Toggle>
 
-        {/* Consistency */}
+        <Toggle title="This Month" icon="📅">
+          <div className="grid grid-cols-7 gap-1">
+            {heat.map((d) => (
+              <div key={d.key} className={`heat-cell ${hLvl(d.pct)}`} title={`${d.key}: ${d.pct}%`}>
+                {d.day}
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center gap-1 text-[10px]" style={{ color: "var(--text-muted)" }}>
+            <span>0%</span>
+            {["heat-0", "heat-1", "heat-2", "heat-3", "heat-4"].map((c) => (
+              <span key={c} className={`heat-cell ${c}`} style={{ width: 10, height: 10, fontSize: 0 }} />
+            ))}
+            <span>100%</span>
+          </div>
+        </Toggle>
+
+        <Toggle title="Activity Calendar" icon="🗓️">
+          <div className="flex gap-1 overflow-x-auto pb-2" dir="ltr">
+            <div className="flex gap-1" style={{ minWidth: "max-content" }}>
+              {Array.from({ length: Math.ceil(contributionGrid.length / 7) }).map((_, colIndex) => (
+                <div key={colIndex} className="flex flex-col gap-1">
+                  {contributionGrid.slice(colIndex * 7, (colIndex + 1) * 7).map((d) => (
+                    <div 
+                      key={d.key} 
+                      className={`heat-cell ${hLvl(d.pct)}`} 
+                      style={{ width: 12, height: 12, fontSize: 0 }}
+                      title={`${d.date.toLocaleDateString()}: ${d.pct}%`} 
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Toggle>
+
         <Toggle title="Habit Consistency" icon="🎯">
-          <div className="grid gap-3">
+          <div className="flex gap-2 mb-3">
+            <select
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+              className="scripture-field text-[11px] py-1 px-2 flex-1"
+            >
+              <option value="all">All Months</option>
+              {Array.from({ length: 12 }).map((_, i) => {
+                const date = new Date(2000, i, 1);
+                return <option key={i} value={i}>{date.toLocaleString('default', { month: 'long' })}</option>
+              })}
+            </select>
+            <select
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value)}
+              className="scripture-field text-[11px] py-1 px-2 flex-1"
+            >
+              <option value="all">All Years</option>
+              <option value="2026">2026</option>
+              <option value="2027">2027</option>
+              <option value="2028">2028</option>
+            </select>
+          </div>
+          <div className="grid gap-2.5">
             {breakdown.map((item) => (
               <div key={item.key}>
-                <div className="mb-1.5 flex items-center gap-2 text-[12px]">
+                <div className="mb-1 flex items-center gap-2 text-[12px]">
                   <span>{item.icon}</span>
                   <span style={{ color: "var(--text-secondary)", flex: 1 }}>{item.label}</span>
                   <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{item.consistency}%</span>

@@ -11,20 +11,21 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { weekData, scriptures } = body as {
+    const { weekData, scriptures, goals } = body as {
       weekData: Array<{
         date: string;
         habits: Record<string, string | false | true>;
         scriptures?: Array<{ passage: string; notes: string; type: string }>;
       }>;
       scriptures?: Array<{ passage: string; notes: string; type: string }>;
+      goals?: Array<{ text: string; type: string }>;
     };
 
     if (!weekData || !Array.isArray(weekData)) {
       return Response.json({ error: "Missing weekData" }, { status: 400 });
     }
 
-    const prompt = buildAnalysisPrompt(weekData, scriptures);
+    const prompt = buildAnalysisPrompt(weekData, scriptures, goals);
 
     const geminiResponse = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
       method: "POST",
@@ -75,7 +76,8 @@ function buildAnalysisPrompt(
     habits: Record<string, string | false | true>;
     scriptures?: Array<{ passage: string; notes: string; type: string }>;
   }>,
-  allScriptures?: Array<{ passage: string; notes: string; type: string }>
+  allScriptures?: Array<{ passage: string; notes: string; type: string }>,
+  goals?: Array<{ text: string; type: string }>
 ): string {
   const habitLines = weekData
     .map((day) => {
@@ -104,7 +106,12 @@ function buildAnalysisPrompt(
       ? `\n\nAll scripture entries this week:\n${allScriptures.map((s) => `- [${s.type}] ${s.passage}: ${s.notes}`).join("\n")}`
       : "";
 
+  const goalsContext = goals && goals.length > 0
+    ? `\n\nUSER'S LIFE GOALS & MOTIVATIONS:\n${goals.map((g) => `- [${g.type.toUpperCase()}] ${g.text}`).join("\n")}\n\nUse these goals as aggressive leverage to intensely motivate the user. Remind them why they are bleeding for this. Cut the generic advice and be sharp.`
+    : "";
+
   return `You are a Christian accountability partner and performance coach. Analyze this person's weekly habit data and provide honest, motivating feedback.
+${goalsContext}
 
 HABIT DATA FOR THE WEEK:
 ${habitLines}
@@ -112,6 +119,7 @@ ${allScriptureContext}
 
 The habits tracked are:
 - morningPrayer: Morning prayer routine
+- bibleReading: Reading Bible portions
 - scriptureMemorization: Memorizing Bible verses
 - nightReflectionPrayer: Evening reflection prayer
 - leetCodeTwoProblems: Solving 2 LeetCode coding problems
