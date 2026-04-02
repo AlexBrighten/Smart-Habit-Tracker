@@ -1,7 +1,5 @@
 import { type NextRequest } from "next/server";
-
-const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -27,40 +25,30 @@ export async function POST(request: NextRequest) {
 
     const prompt = buildFlashcardPrompt(memorized, readings);
 
-    const geminiResponse = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.6,
-          maxOutputTokens: 2000,
-          responseMimeType: "application/json",
-        },
-      }),
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash",
+      generationConfig: {
+        temperature: 0.6,
+        maxOutputTokens: 2000,
+        responseMimeType: "application/json",
+      }
     });
 
-    if (!geminiResponse.ok) {
-      const errText = await geminiResponse.text();
-      console.error("Gemini flashcard error:", errText);
-      return Response.json({ error: "Flashcard generation failed" }, { status: 502 });
-    }
+    const result = await model.generateContent(prompt);
+    const rawText = result.response.text();
 
-    const geminiData = await geminiResponse.json();
-    const rawText =
-      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-
-    let result;
+    let data;
     try {
-      result = JSON.parse(rawText);
+      data = JSON.parse(rawText);
     } catch {
-      result = {
+      data = {
         readingSummary: "Could not generate summary.",
         flashcards: [],
       };
     }
 
-    return Response.json(result);
+    return Response.json(data);
   } catch (err) {
     console.error("Flashcard route error:", err);
     return Response.json({ error: "Internal server error" }, { status: 500 });

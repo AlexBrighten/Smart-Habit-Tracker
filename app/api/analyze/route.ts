@@ -1,7 +1,5 @@
 import { type NextRequest } from "next/server";
-
-const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -27,28 +25,18 @@ export async function POST(request: NextRequest) {
 
     const prompt = buildAnalysisPrompt(weekData, scriptures, goals);
 
-    const geminiResponse = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 1500,
-          responseMimeType: "application/json",
-        },
-      }),
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-2.5-flash",
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 1500,
+        responseMimeType: "application/json",
+      }
     });
 
-    if (!geminiResponse.ok) {
-      const errText = await geminiResponse.text();
-      console.error("Gemini API error:", errText);
-      return Response.json({ error: "AI analysis failed" }, { status: 502 });
-    }
-
-    const geminiData = await geminiResponse.json();
-    const rawText =
-      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const result = await model.generateContent(prompt);
+    const rawText = result.response.text();
 
     let analysis;
     try {
